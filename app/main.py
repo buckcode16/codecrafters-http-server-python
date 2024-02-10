@@ -11,15 +11,9 @@ def main():
             print(f"Connnection from {client_address} has been established.")
 
             with client_socket:
-                message = client_socket.recv(1024).decode("utf-8")
-                print(f"Received from client: {message}")
+                
+                send_response(client_socket)
 
-                path = extract_path(message)
-
-                if(path == '/' or path.startswith('/echo/')):
-                    send_response(client_socket,path)
-                else:
-                    send_response(client_socket,path, status_code = 404)
 
 
 def extract_path(http_request):
@@ -49,21 +43,27 @@ def extract_last_string(http_request):
     extract = random_string[-1] if len(random_string) > 1 else None
     return extract
 
-def send_response(client_socket, path, status_code = 200):
+def send_response(client_socket, status_code = 200):
+
+    message = client_socket.recv(1024).decode("utf-8")
+    # print(f"Received from client: {message}")
+
+    path = extract_path(message)
 
     content_type = "text/html; charset=UTF-8"
     body = ''
     status_message = "OK"
 
-    if path.startswith('/echo/'):
+    if path.startswith('/echo/') or path.startswith('/user-agent'):
         content_type = "text/plain"
-        body = path[len('/echo/'):]
     
-    if (status_code == 404):
+    if (path != '/' and not path.startswith('/echo/') and path != '/user-agent'):
+        status_code = 404
         status_message = "Not Found"
 
-    response_body = body.encode("utf-8")
-    content_length = len(response_body)
+
+    response_body = get_user_agent(message).encode("utf-8") if path.startswith('/user-agent') else path[len('/echo/'):].encode("utf-8")
+    content_length = len(path[len('/echo/'):]) if path.startswith('/echo/') else len(response_body)
 
     response_headers = f"HTTP/1.1 {status_code} {status_message}\r\n"\
                       f"Content-Type: {content_type}\r\n"\
@@ -71,6 +71,12 @@ def send_response(client_socket, path, status_code = 200):
     response = response_headers.encode("utf-8") + response_body
 
     client_socket.sendall(response)
+
+def get_user_agent(message):
+    headers = message.split('\r\n')
+
+    user_agent = next((header.split(': ')[1] for header in headers if header.startswith('User-Agent')), 'Unknown')
+    return user_agent
 
 if __name__ == "__main__":
     main()
