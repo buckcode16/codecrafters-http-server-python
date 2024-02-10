@@ -1,4 +1,5 @@
 import socket
+import threading
 
 def main():
     HOST = 'localhost'
@@ -10,9 +11,8 @@ def main():
             client_socket, client_address = server_socket.accept()
             print(f"Connnection from {client_address} has been established.")
 
-            with client_socket:
-                
-                send_response(client_socket)
+            client_thread = threading.Thread(target=handle_client, args=(client_socket,))
+            client_thread.start()
 
 
 
@@ -71,12 +71,16 @@ def send_response(client_socket, status_code = 200):
     response = response_headers.encode("utf-8") + response_body
 
     client_socket.sendall(response)
+    client_socket.close()
 
 def get_user_agent(message):
     headers = message.split('\r\n')
 
     user_agent = next((header.split(': ')[1] for header in headers if header.startswith('User-Agent')), 'Unknown')
     return user_agent
+
+def handle_client(client_socket):
+    send_response(client_socket)
 
 if __name__ == "__main__":
     main()
