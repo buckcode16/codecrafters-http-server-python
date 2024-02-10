@@ -4,12 +4,16 @@ import threading
 def main():
     HOST = 'localhost'
     PORT = 4221
-    while True:
-        print(f"Server is listening on {HOST},{PORT}")
+    
+    print(f"Server is listening on {HOST},{PORT}")
 
-        with socket.create_server((HOST, PORT), reuse_port=True) as server_socket:
-            
-            client_thread = threading.Thread(target=handle_client, args=(server_socket,))
+    with socket.create_server((HOST, PORT), reuse_port=True) as server_socket:
+        while True:
+        
+            client_socket, client_address = server_socket.accept()
+            print(f"Connnection from {client_address} has been established.")
+
+            client_thread = threading.Thread(target=handle_client, args=(client_socket,))
             client_thread.start()
 
 
@@ -77,9 +81,7 @@ def get_user_agent(message):
     user_agent = next((header.split(': ')[1] for header in headers if header.startswith('User-Agent')), 'Unknown')
     return user_agent
 
-def handle_client(server_socket):
-    client_socket, client_address = server_socket.accept()
-    print(f"Connnection from {client_address} has been established.")
+def handle_client(client_socket):
     send_response(client_socket)
     pass
 
