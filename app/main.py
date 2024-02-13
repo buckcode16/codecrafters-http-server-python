@@ -83,13 +83,24 @@ def send_response(client_socket, status_code = 200):
         directory_path = args.directory
         filename = path[len('/files/'):]
 
-        content, exists = check_file(filename,directory_path)
+        if(get_http_method(message) == "GET"):
+            content, exists = get_file(filename,directory_path)
 
-        if exists:
-            response_body = content
-            content_length = len(response_body)
-            status_code = "200"
-            status_message = "OK"
+            if exists:
+                response_body = content
+                content_length = len(response_body)
+                status_code = "200"
+                status_message = "OK"
+        else:
+            body = get_file_content(message)
+            post_file(filename, directory_path, body)
+            content, exists = get_file(filename,directory_path)
+            if exists:
+                response_body = content
+                content_length = len(response_body)
+                status_code = "201"
+                status_message = "OK"
+
     
     else:
         status_code = 404
@@ -107,14 +118,15 @@ def send_response(client_socket, status_code = 200):
 def get_user_agent(message):
     headers = message.split('\r\n')
 
-    user_agent = next((header.split(': ')[1] for header in headers if header.startswith('User-Agent')), 'Unknown')
+    user_agent = next((header.split(': ')[1] for header in headers 
+                       if header.startswith('User-Agent')), 'Unknown')
     return user_agent
 
 def handle_client(client_socket):
     send_response(client_socket)
     pass
 
-def check_file(filename, directory_path):
+def get_file(filename, directory_path):
 
     full_path = os.path.join(directory_path, filename)
     if os.path.exists(full_path):
@@ -124,6 +136,22 @@ def check_file(filename, directory_path):
     else:
         return None, False
 
+def post_file(filename, directory_path, body):
+    full_path = os.path.join(directory_path, filename)
+
+    with open(full_path, 'w') as file:
+        content = file.write(body)
+        return content, True
+
+def get_http_method(request):
+    request_lines = request.split("\n")
+    http_method = request_lines[0].split(" ")[0]
+    return http_method
+
+def get_file_content(request):
+    request_lines = request.split("\n")
+    body = request_lines[-1]
+    return body
 
 if __name__ == "__main__":
     main()
