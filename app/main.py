@@ -1,11 +1,14 @@
 import socket
 import threading
+import argparse
+import os
 
 def main():
     HOST = 'localhost'
     PORT = 4221
     
     print(f"Server is listening on {HOST},{PORT}")
+
 
     with socket.create_server((HOST, PORT), reuse_port=True) as server_socket:
         while True:
@@ -49,24 +52,50 @@ def extract_last_string(http_request):
 def send_response(client_socket, status_code = 200):
 
     message = client_socket.recv(1024).decode("utf-8")
-    # print(f"Received from client: {message}")
 
     path = extract_path(message)
 
     content_type = "text/html; charset=UTF-8"
-    body = ''
+    response_body = ''.encode("utf-8")
     status_message = "OK"
-
-    if path.startswith('/echo/') or path.startswith('/user-agent'):
-        content_type = "text/plain"
+    content_length = len(response_body)
     
-    if (path != '/' and not path.startswith('/echo/') and path != '/user-agent'):
+
+    if path == ('/') or path.startswith('/echo/') or path.startswith('/user-agent'):
+        content_type = "text/plain"
+        
+        if path.startswith('/echo/'):
+            response_body = path[len('/echo/'):].encode("utf-8")
+            content_length = len(path[len('/echo/'):])
+        else:
+            response_body = get_user_agent(message).encode("utf-8")
+            content_length = len(response_body)
+
+    elif path.startswith('/files/'):
         status_code = 404
         status_message = "Not Found"
+        
+        content_type = "application/octet-stream"
 
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--directory',type=str)
+        args = parser.parse_args()
+        directory_path = args.directory
+        filename = path[len('/files/'):]
 
-    response_body = get_user_agent(message).encode("utf-8") if path.startswith('/user-agent') else path[len('/echo/'):].encode("utf-8")
-    content_length = len(path[len('/echo/'):]) if path.startswith('/echo/') else len(response_body)
+        content, exists = check_file(filename,directory_path)
+
+        if exists:
+            response_body = content
+            content_length = len(response_body)
+            status_code = "200"
+            status_message = "OK"
+    
+    else:
+        status_code = 404
+        status_message = "Not Found"
+        content_length = 0
+
 
     response_headers = f"HTTP/1.1 {status_code} {status_message}\r\n"\
                       f"Content-Type: {content_type}\r\n"\
@@ -84,6 +113,17 @@ def get_user_agent(message):
 def handle_client(client_socket):
     send_response(client_socket)
     pass
+
+def check_file(filename, directory_path):
+
+    full_path = os.path.join(directory_path, filename)
+    if os.path.exists(full_path):
+        with open(full_path, 'rb') as file:
+            content = file.read()
+            return content, True
+    else:
+        return None, False
+
 
 if __name__ == "__main__":
     main()
